@@ -1,0 +1,2769 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Minva Messenger 2.0.0</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        /* ========== БАЗОВЫЕ СТИЛИ ========== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        body {
+            background: #f5f7fa;
+            color: #333;
+            transition: background-color 0.3s, color 0.3s;
+            min-height: 100vh;
+        }
+
+        /* ========== АУТЕНТИФИКАЦИЯ ========== */
+        .auth-screen {
+            background: linear-gradient(135deg, #FFB347, #89CFF0, #7393B3);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .auth-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .auth-header h1 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 2rem;
+        }
+
+        .auth-header h1 i {
+            color: #FFB347;
+            margin-right: 10px;
+        }
+
+        .version {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .auth-form h2 {
+            color: #333;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #7393B3;
+        }
+
+        .auth-input {
+            width: 100%;
+            padding: 1rem 1rem 1rem 3rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            background: #f8f9fa;
+        }
+
+        .auth-input:focus {
+            outline: none;
+            border-color: #89CFF0;
+            box-shadow: 0 0 0 3px rgba(137, 207, 240, 0.2);
+            background: white;
+        }
+
+        .auth-btn {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(to right, #FFB347, #89CFF0);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 1rem;
+        }
+
+        .auth-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255, 179, 71, 0.4);
+        }
+
+        .auth-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .auth-links {
+            margin-top: 1.5rem;
+            text-align: center;
+        }
+
+        .auth-switch {
+            color: #7393B3;
+            cursor: pointer;
+            text-decoration: underline;
+            font-size: 0.9rem;
+        }
+
+        .auth-switch:hover {
+            color: #FFB347;
+        }
+
+        .privacy-policy-box {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(137, 207, 240, 0.1);
+            border-radius: 10px;
+            border-left: 4px solid #89CFF0;
+        }
+
+        .privacy-policy-box label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+
+        .privacy-policy-box input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .privacy-policy-box a {
+            color: #FFB347;
+            text-decoration: underline;
+        }
+
+        .privacy-policy-box a:hover {
+            color: #7393B3;
+        }
+
+        /* ========== ОСНОВНОЕ ПРИЛОЖЕНИЕ ========== */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: #f5f7fa;
+        }
+
+        /* Навигация */
+        .navbar {
+            background: linear-gradient(to right, #FFB347, #89CFF0);
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            color: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .menu-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: background 0.3s;
+            margin-right: 1rem;
+        }
+
+        .menu-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .app-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+        }
+
+        .verified-badge {
+            color: #4CAF50;
+            font-size: 1rem;
+        }
+
+        /* Боковое меню */
+        .side-menu {
+            position: fixed;
+            left: -300px;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: white;
+            box-shadow: 2px 0 15px rgba(0,0,0,0.1);
+            transition: left 0.3s ease;
+            z-index: 1001;
+            padding-top: 80px;
+            overflow-y: auto;
+        }
+
+        .side-menu.active {
+            left: 0;
+        }
+
+        .side-menu-section {
+            padding: 1rem 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .side-menu-section h4 {
+            padding: 0 1.5rem;
+            color: #666;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .side-menu-item {
+            padding: 0.8rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: #333;
+            transition: all 0.3s;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+        }
+
+        .side-menu-item:hover {
+            background: rgba(137, 207, 240, 0.1);
+            border-left-color: #89CFF0;
+        }
+
+        .side-menu-item.active {
+            background: rgba(137, 207, 240, 0.1);
+            border-left-color: #89CFF0;
+            color: #2E5077;
+        }
+
+        .menu-badge {
+            margin-left: auto;
+            background: #FFB347;
+            color: white;
+            font-size: 0.8rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 10px;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        /* Основной контент */
+        .main-content {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        /* ========== ЧАТЫ ========== */
+        .chats-view {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .chats-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .chats-header h2 {
+            color: #333;
+        }
+
+        .new-chat-btn {
+            background: linear-gradient(to right, #FFB347, #89CFF0);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 25px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .new-chat-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(255, 179, 71, 0.3);
+        }
+
+        .chats-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .chat-item {
+            background: white;
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 1px solid transparent;
+        }
+
+        .chat-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            border-color: #89CFF0;
+        }
+
+        .chat-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #FFB347, #89CFF0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chat-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .verified-small {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background: #4CAF50;
+            color: white;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            border: 2px solid white;
+        }
+
+        .secret-badge {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: #4CAF50;
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 4px;
+            border-radius: 10px;
+        }
+
+        .chat-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .chat-name-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.3rem;
+        }
+
+        .chat-name {
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .unread-badge {
+            background: #FFB347;
+            color: white;
+            font-size: 0.8rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 10px;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .pinned-badge {
+            color: #FFB347;
+            font-size: 0.9rem;
+            margin-right: 0.5rem;
+        }
+
+        .chat-last-message {
+            color: #666;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .online-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #4CAF50;
+            border-radius: 50%;
+            margin-left: 5px;
+        }
+
+        /* ========== ОКНО ЧАТА ========== */
+        .chat-view {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 120px);
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .chat-header {
+            background: linear-gradient(to right, #FFB347, #89CFF0);
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            border-radius: 15px 15px 0 0;
+            color: white;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 50%;
+            transition: background 0.3s;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .chat-name-large {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .chat-status {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .chat-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-left: auto;
+        }
+
+        .chat-action-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .chat-action-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .chat-window {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .messages-container {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .message {
+            max-width: 70%;
+            padding: 0.8rem 1rem;
+            border-radius: 18px;
+            position: relative;
+            animation: fadeIn 0.3s ease;
+            word-wrap: break-word;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.sent {
+            background: linear-gradient(135deg, #89CFF0, #7393B3);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 5px;
+        }
+
+        .message.received {
+            background: #f0f0f0;
+            color: #333;
+            align-self: flex-start;
+            border-bottom-left-radius: 5px;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .message-sender {
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .message-sender:hover {
+            text-decoration: underline;
+        }
+
+        .message-time {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        .message-content {
+            margin-bottom: 0.5rem;
+        }
+
+        .message-reactions {
+            display: flex;
+            gap: 0.3rem;
+            flex-wrap: wrap;
+            margin-top: 0.5rem;
+        }
+
+        .reaction {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .reaction:hover {
+            transform: scale(1.1);
+        }
+
+        .message-actions {
+            position: absolute;
+            top: -20px;
+            right: 10px;
+            display: none;
+            gap: 0.3rem;
+            background: white;
+            border-radius: 20px;
+            padding: 0.3rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        .message:hover .message-actions {
+            display: flex;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            color: #333;
+        }
+
+        .action-btn:hover {
+            background: rgba(137, 207, 240, 0.2);
+            transform: scale(1.1);
+        }
+
+        .message-input-container {
+            background: white;
+            padding: 1rem;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            border-radius: 0 0 15px 15px;
+        }
+
+        .emoji-btn, .attach-btn, .gift-btn {
+            background: none;
+            border: none;
+            color: #7393B3;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 50%;
+            transition: background 0.3s;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .emoji-btn:hover, .attach-btn:hover, .gift-btn:hover {
+            background: rgba(137, 207, 240, 0.1);
+        }
+
+        .message-input-wrapper {
+            flex: 1;
+        }
+
+        .message-input {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 1rem;
+            background: #f8f9fa;
+            resize: none;
+            min-height: 44px;
+            max-height: 120px;
+            transition: all 0.3s;
+        }
+
+        .message-input:focus {
+            outline: none;
+            border-color: #89CFF0;
+            box-shadow: 0 0 0 3px rgba(137, 207, 240, 0.2);
+            background: white;
+        }
+
+        .voice-record-btn {
+            background: #FFB347;
+            color: white;
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1.2rem;
+        }
+
+        .voice-record-btn:hover {
+            background: #ff9c47;
+            transform: scale(1.05);
+        }
+
+        .voice-record-btn.recording {
+            animation: pulse 1.5s infinite;
+            background: #f44336;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .send-btn {
+            background: linear-gradient(135deg, #89CFF0, #7393B3);
+            color: white;
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1.2rem;
+        }
+
+        .send-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(137, 207, 240, 0.4);
+        }
+
+        /* ========== ГОЛОСОВЫЕ СООБЩЕНИЯ ========== */
+        .voice-message-player {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            min-width: 200px;
+        }
+
+        .play-btn {
+            background: white;
+            color: #7393B3;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .voice-progress {
+            flex: 1;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        .voice-progress-bar {
+            height: 100%;
+            background: white;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .voice-duration {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.8);
+            min-width: 40px;
+        }
+
+        /* ========== ДРУЗЬЯ ========== */
+        .friends-view {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .friends-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .friends-header h2 {
+            color: #333;
+        }
+
+        .friends-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .friends-tab {
+            padding: 0.5rem 1rem;
+            background: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+            color: #333;
+            border: 1px solid #e0e0e0;
+        }
+
+        .friends-tab:hover {
+            background: rgba(137, 207, 240, 0.1);
+        }
+
+        .friends-tab.active {
+            background: #89CFF0;
+            color: white;
+            border-color: #89CFF0;
+        }
+
+        .friends-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .friend-item {
+            background: white;
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .friend-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .friend-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #FFB347, #89CFF0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .friend-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .friend-info {
+            flex: 1;
+        }
+
+        .friend-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.3rem;
+        }
+
+        .friend-status {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .friend-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .friend-action-btn {
+            background: none;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: #7393B3;
+        }
+
+        .friend-action-btn:hover {
+            background: rgba(137, 207, 240, 0.1);
+            transform: scale(1.1);
+        }
+
+        .friend-request-item {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .friend-request-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #FFB347, #89CFF0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .friend-request-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .friend-request-info {
+            flex: 1;
+        }
+
+        .friend-request-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .friend-request-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .friend-request-accept {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .friend-request-accept:hover {
+            transform: scale(1.1);
+        }
+
+        .friend-request-decline {
+            background: #f44336;
+            color: white;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .friend-request-decline:hover {
+            transform: scale(1.1);
+        }
+
+        /* ========== ПОДАРКИ ========== */
+        .gifts-view {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .gifts-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .gifts-header h2 {
+            color: #333;
+        }
+
+        .upload-btn {
+            background: linear-gradient(to right, #FFB347, #89CFF0);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 25px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(255, 179, 71, 0.3);
+        }
+
+        .gifts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1.5rem;
+            padding: 1rem;
+        }
+
+        .gift-item {
+            background: white;
+            border-radius: 15px;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+
+        .gift-item:hover {
+            transform: translateY(-5px);
+            border-color: #FFB347;
+            box-shadow: 0 10px 30px rgba(255, 179, 71, 0.2);
+        }
+
+        .gift-image {
+            width: 100%;
+            height: 120px;
+            object-fit: contain;
+            margin-bottom: 0.8rem;
+            border-radius: 10px;
+        }
+
+        .gift-name {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+
+        .gift-price {
+            color: #FFB347;
+            font-weight: bold;
+            margin: 0.5rem 0;
+            font-size: 1.1rem;
+        }
+
+        .gift-description {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.8rem;
+            height: 40px;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .send-gift-btn {
+            background: #89CFF0;
+            color: white;
+            border: none;
+            padding: 0.6rem 1rem;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .send-gift-btn:hover {
+            background: #7393B3;
+            transform: translateY(-2px);
+        }
+
+        /* ========== ИГРЫ ========== */
+        .games-view {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .games-view h2 {
+            color: #333;
+            margin-bottom: 1.5rem;
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .game-card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .game-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #FFB347, #89CFF0);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .game-card h3 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .game-card p {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .play-btn {
+            background: #89CFF0;
+            color: white;
+            border: none;
+            padding: 0.6rem 1.5rem;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .play-btn:hover {
+            background: #7393B3;
+            transform: translateY(-2px);
+        }
+
+        /* ========== КОНТЕЙНЕР ИГРЫ ========== */
+        .game-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            z-index: 10000;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .game-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+
+        .game-players {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .player-info {
+            text-align: center;
+            padding: 1rem;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+
+        .player-info.current-player {
+            background: rgba(76, 175, 80, 0.1);
+            border: 2px solid #4CAF50;
+        }
+
+        .player-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #FFB347, #89CFF0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.5rem;
+            margin: 0 auto 0.5rem;
+        }
+
+        .player-symbol {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-top: 0.5rem;
+        }
+
+        .vs {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #FFB347;
+        }
+
+        .tic-tac-toe-board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 1.5rem 0;
+        }
+
+        .ttt-cell {
+            aspect-ratio: 1;
+            background: #f8f9fa;
+            border: 2px solid #89CFF0;
+            font-size: 3rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 10px;
+        }
+
+        .ttt-cell:hover:not(:disabled) {
+            background: rgba(137, 207, 240, 0.2);
+            transform: scale(1.05);
+        }
+
+        .ttt-cell:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .game-status {
+            text-align: center;
+            font-size: 1.2rem;
+            padding: 1rem;
+            background: rgba(137, 207, 240, 0.1);
+            border-radius: 10px;
+            margin: 1rem 0;
+        }
+
+        /* ========== НАСТРОЙКИ ========== */
+        .settings-view {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .settings-view h2 {
+            color: #333;
+            margin-bottom: 1.5rem;
+        }
+
+        .settings-container {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+        }
+
+        .settings-section {
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .settings-section:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .settings-section h3 {
+            color: #333;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .settings-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .settings-item:last-child {
+            border-bottom: none;
+        }
+
+        .setting-label {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .setting-value {
+            color: #666;
+        }
+
+        .setting-select {
+            padding: 0.5rem 1rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            color: #333;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .setting-select:focus {
+            outline: none;
+            border-color: #89CFF0;
+            box-shadow: 0 0 0 2px rgba(137, 207, 240, 0.2);
+        }
+
+        .settings-btn {
+            background: #89CFF0;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .settings-btn:hover {
+            background: #7393B3;
+            transform: translateY(-2px);
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #89CFF0;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        /* ========== АДМИН-ПАНЕЛЬ ========== */
+        .admin-view {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .admin-header {
+            background: linear-gradient(135deg, #7393B3, #2E5077);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .admin-header h2 {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .admin-role {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .admin-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .admin-tab {
+            background: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+            color: #333;
+            border: 1px solid #e0e0e0;
+        }
+
+        .admin-tab:hover {
+            background: rgba(137, 207, 240, 0.2);
+        }
+
+        .admin-tab.active {
+            background: #89CFF0;
+            color: white;
+            border-color: #89CFF0;
+        }
+
+        .admin-content {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+        }
+
+        .admin-tab-content h3 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        .admin-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #89CFF0, #7393B3);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-card h4 {
+            margin: 0 0 10px 0;
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .stat-card div {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .admin-user-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .admin-gift-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .ticket-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 0.5rem;
+        }
+
+        .ticket-status {
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .ticket-status.pending {
+            background: #ff9800;
+            color: white;
+        }
+
+        .ticket-status.responded {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .ticket-status.closed {
+            background: #999;
+            color: white;
+        }
+
+        .report-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 0.5rem;
+        }
+
+        .report-status.pending {
+            background: #ff9800;
+            color: white;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+
+        /* ========== ПОИСК ========== */
+        .search-view {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .search-container {
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 1rem 1rem 1rem 3rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 1rem;
+            background: white;
+            color: #333;
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #89CFF0;
+            box-shadow: 0 0 0 3px rgba(137, 207, 240, 0.2);
+        }
+
+        .search-results {
+            margin-top: 1.5rem;
+        }
+
+        .search-result-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .search-result-item:hover {
+            background: #f8f9fa;
+            transform: translateX(5px);
+        }
+
+        /* ========== УВЕДОМЛЕНИЯ ========== */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            z-index: 10000;
+            animation: slideInRight 0.3s ease;
+            max-width: 350px;
+            border-left: 4px solid;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .notification-success {
+            border-left-color: #4CAF50;
+        }
+
+        .notification-error {
+            border-left-color: #f44336;
+        }
+
+        .notification-info {
+            border-left-color: #2196F3;
+        }
+
+        .notification-warning {
+            border-left-color: #ff9800;
+        }
+
+        .notification-close {
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0.2rem;
+            margin-left: auto;
+        }
+
+        /* ========== МОДАЛЬНЫЕ ОКНА ========== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+            padding: 0.5rem;
+            border-radius: 50%;
+        }
+
+        .modal-close:hover {
+            background: rgba(0,0,0,0.05);
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            background: #f8f9fa;
+        }
+
+        .modal-input:focus {
+            outline: none;
+            border-color: #89CFF0;
+            box-shadow: 0 0 0 2px rgba(137, 207, 240, 0.2);
+            background: white;
+        }
+
+        .modal-btn {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(to right, #FFB347, #89CFF0);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .modal-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255, 179, 71, 0.4);
+        }
+
+        .modal-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ========== ЭМОДЗИ-ПИКЕР ========== */
+        .emoji-picker {
+            position: absolute;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 1rem;
+            z-index: 1000;
+            width: 250px;
+        }
+
+        .emoji-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+        }
+
+        .emoji-btn-small {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .emoji-btn-small:hover {
+            background: rgba(137, 207, 240, 0.2);
+            transform: scale(1.2);
+        }
+
+        /* ========== ПУСТЫЕ СОСТОЯНИЯ ========== */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #666;
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* ========== ЗАГРУЗКА ========== */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 200px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(137, 207, 240, 0.3);
+            border-top-color: #89CFF0;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ========== СНЕЖИНКИ ========== */
+        #snowflakes-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9998;
+        }
+
+        .snowflake {
+            position: fixed;
+            color: white;
+            animation: fall linear infinite;
+            pointer-events: none;
+            user-select: none;
+            text-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+            }
+        }
+
+        /* ========== СЕССИИ ========== */
+        .session-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .session-info {
+            flex: 1;
+        }
+
+        .terminate-btn {
+            background: rgba(244, 67, 54, 0.1);
+            color: #f44336;
+            border: 1px solid #f44336;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .terminate-btn:hover {
+            background: #f44336;
+            color: white;
+        }
+
+        /* ========== ТЕМНАЯ ТЕМА ========== */
+        body.dark-theme {
+            background: #1a1a2e;
+            color: white;
+        }
+
+        body.dark-theme .auth-container {
+            background: #16213e;
+            color: white;
+        }
+
+        body.dark-theme .auth-header h1,
+        body.dark-theme .auth-form h2 {
+            color: white;
+        }
+
+        body.dark-theme .auth-input {
+            background: #2d3748;
+            border-color: #4a5568;
+            color: white;
+        }
+
+        body.dark-theme .auth-input::placeholder {
+            color: #b0b0b0;
+        }
+
+        body.dark-theme .side-menu {
+            background: #16213e;
+        }
+
+        body.dark-theme .side-menu-item {
+            color: white;
+        }
+
+        body.dark-theme .side-menu-section {
+            border-bottom-color: #2d3748;
+        }
+
+        body.dark-theme .side-menu-section h4 {
+            color: #b0b0b0;
+        }
+
+        body.dark-theme .chat-item,
+        body.dark-theme .gift-item,
+        body.dark-theme .game-card,
+        body.dark-theme .settings-container,
+        body.dark-theme .admin-content,
+        body.dark-theme .search-result-item,
+        body.dark-theme .modal,
+        body.dark-theme .friend-item,
+        body.dark-theme .friend-request-item,
+        body.dark-theme .admin-user-item,
+        body.dark-theme .admin-gift-item,
+        body.dark-theme .ticket-item,
+        body.dark-theme .report-item,
+        body.dark-theme .session-item {
+            background: #16213e;
+            color: white;
+        }
+
+        body.dark-theme .chat-name,
+        body.dark-theme .gift-name,
+        body.dark-theme .game-card h3,
+        body.dark-theme .settings-section h3,
+        body.dark-theme .setting-label {
+            color: white;
+        }
+
+        body.dark-theme .chat-last-message,
+        body.dark-theme .gift-description,
+        body.dark-theme .game-card p,
+        body.dark-theme .setting-value {
+            color: #b0b0b0;
+        }
+
+        body.dark-theme .setting-select {
+            background: #2d3748;
+            border-color: #4a5568;
+            color: white;
+        }
+
+        body.dark-theme .message.received {
+            background: #16213e;
+            color: white;
+        }
+
+        body.dark-theme .message-input-container {
+            background: #16213e;
+            border-top-color: #2d3748;
+        }
+
+        body.dark-theme .message-input {
+            background: #2d3748;
+            color: white;
+            border-color: #4a5568;
+        }
+
+        body.dark-theme .message-input::placeholder {
+            color: #b0b0b0;
+        }
+
+        body.dark-theme .notification {
+            background: #16213e;
+            color: white;
+        }
+
+        body.dark-theme .empty-state {
+            color: #b0b0b0;
+        }
+
+        /* ========== НОВОГОДНЯЯ ТЕМА ========== */
+        body.new-year-theme {
+            background: #0f3460;
+            color: white;
+        }
+
+        body.new-year-theme .navbar {
+            background: linear-gradient(to right, #e94560, #ff6b6b);
+        }
+
+        body.new-year-theme .chat-header {
+            background: linear-gradient(to right, #e94560, #ff6b6b);
+        }
+
+        body.new-year-theme .message.sent {
+            background: linear-gradient(135deg, #e94560, #ff6b6b);
+        }
+
+        body.new-year-theme .auth-btn,
+        body.new-year-theme .new-chat-btn,
+        body.new-year-theme .upload-btn {
+            background: linear-gradient(to right, #e94560, #ff6b6b);
+        }
+
+        body.new-year-theme .side-menu {
+            background: #16213e;
+        }
+
+        body.new-year-theme .chat-item {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid #e94560;
+        }
+
+        body.new-year-theme .message.received {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            color: white;
+        }
+
+        body.new-year-theme .gift-item,
+        body.new-year-theme .game-card,
+        body.new-year-theme .settings-container,
+        body.new-year-theme .admin-content,
+        body.new-year-theme .friend-item,
+        body.new-year-theme .friend-request-item {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid #e94560;
+        }
+
+        /* ========== АДАПТИВНОСТЬ ========== */
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 0.8rem 1rem;
+            }
+            
+            .side-menu {
+                width: 100%;
+                left: -100%;
+            }
+            
+            .message {
+                max-width: 85%;
+            }
+            
+            .gifts-container {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+                gap: 1rem;
+            }
+            
+            .chat-view {
+                height: calc(100vh - 100px);
+            }
+            
+            .admin-tabs {
+                overflow-x: auto;
+                flex-wrap: nowrap;
+            }
+            
+            .admin-tab {
+                white-space: nowrap;
+            }
+            
+            .game-container {
+                width: 95%;
+                padding: 1rem;
+            }
+            
+            .admin-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .friend-item {
+                flex-wrap: wrap;
+            }
+            
+            .friend-actions {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .app-title {
+                font-size: 1.2rem;
+            }
+            
+            .message-input-container {
+                padding: 0.8rem;
+                gap: 0.5rem;
+            }
+            
+            .emoji-btn, .attach-btn, .gift-btn {
+                width: 36px;
+                height: 36px;
+                font-size: 1rem;
+            }
+            
+            .voice-record-btn, .send-btn {
+                width: 40px;
+                height: 40px;
+            }
+            
+            .games-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .auth-container {
+                padding: 1.5rem;
+            }
+            
+            .friends-tabs {
+                justify-content: center;
+            }
+            
+            .game-players {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .vs {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Экран аутентификации -->
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-container">
+            <div class="auth-header">
+                <h1><i class="fas fa-comments"></i> Minva Messenger</h1>
+                <p class="version">Версия 2.0.0</p>
+            </div>
+            
+            <!-- Форма входа -->
+            <div id="login-form" class="auth-form">
+                <h2>Вход в аккаунт</h2>
+                <div class="input-group">
+                    <i class="fas fa-user input-icon"></i>
+                    <input type="text" id="login-username" placeholder="Логин" class="auth-input">
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-lock input-icon"></i>
+                    <input type="password" id="login-password" placeholder="Пароль" class="auth-input">
+                </div>
+                <div style="margin: 1rem 0;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; color: #333;">
+                        <input type="checkbox" id="login-remember" checked>
+                        <span>Запомнить меня</span>
+                    </label>
+                </div>
+                <button onclick="login()" class="auth-btn" id="login-btn">
+                    <i class="fas fa-sign-in-alt"></i> Войти
+                </button>
+                <div class="auth-links">
+                    <p class="auth-switch" onclick="showRegister()">
+                        <i class="fas fa-user-plus"></i> Создать аккаунт
+                    </p>
+                </div>
+                
+                <!-- Тестовые аккаунты УДАЛЕНЫ - теперь только админы знают о них -->
+            </div>
+            
+            <!-- Форма регистрации -->
+            <div id="register-form" class="auth-form" style="display: none;">
+                <h2>Регистрация</h2>
+                <div class="input-group">
+                    <i class="fas fa-user input-icon"></i>
+                    <input type="text" id="reg-username" placeholder="Логин" class="auth-input">
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-envelope input-icon"></i>
+                    <input type="email" id="reg-email" placeholder="Email" class="auth-input">
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-lock input-icon"></i>
+                    <input type="password" id="reg-password" placeholder="Пароль" class="auth-input">
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-lock input-icon"></i>
+                    <input type="password" id="reg-confirm" placeholder="Повторите пароль" class="auth-input">
+                </div>
+                
+                <!-- Политика конфиденциальности -->
+                <div class="privacy-policy-box">
+                    <label>
+                        <input type="checkbox" id="privacy-checkbox">
+                        <span>Я согласен с <a href="#" onclick="showPrivacyPolicyModal(); return false;">Политикой конфиденциальности</a></span>
+                    </label>
+                </div>
+                
+                <button onclick="register()" class="auth-btn" id="register-btn" disabled>
+                    <i class="fas fa-user-plus"></i> Зарегистрироваться
+                </button>
+                <div class="auth-links">
+                    <p class="auth-switch" onclick="showLogin()">
+                        <i class="fas fa-sign-in-alt"></i> Уже есть аккаунт? Войти
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Основное приложение -->
+    <div id="main-app" class="app-container" style="display: none;">
+        <!-- Навигационная панель -->
+        <nav class="navbar">
+            <button class="menu-btn" onclick="toggleSideMenu()">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h1 class="app-title">Minva Messenger</h1>
+            <div class="user-info">
+                <span id="current-username"></span>
+                <i id="verified-icon" class="fas fa-check-circle verified-badge" style="display: none;"></i>
+                <span id="user-balance" style="margin-left: 10px; background: rgba(255,255,255,0.2); padding: 5px 10px; border-radius: 20px;">
+                    <i class="fas fa-coins"></i> <span id="balance-amount">1000</span>
+                </span>
+            </div>
+        </nav>
+
+        <!-- Боковое меню -->
+        <div id="side-menu" class="side-menu">
+            <div class="side-menu-section">
+                <h4>Основное</h4>
+                <div class="side-menu-item" onclick="showChats()">
+                    <i class="fas fa-comments"></i>
+                    <span>Чаты</span>
+                    <span class="menu-badge" id="unread-total">0</span>
+                </div>
+                <div class="side-menu-item" onclick="showFriends()">
+                    <i class="fas fa-users"></i>
+                    <span>Друзья</span>
+                    <span class="menu-badge" id="friend-requests-badge">0</span>
+                </div>
+                <div class="side-menu-item" onclick="showGifts()">
+                    <i class="fas fa-gift"></i>
+                    <span>Подарки</span>
+                </div>
+                <div class="side-menu-item" onclick="showGames()">
+                    <i class="fas fa-gamepad"></i>
+                    <span>Игры</span>
+                </div>
+                <div class="side-menu-item" onclick="showSearch()">
+                    <i class="fas fa-search"></i>
+                    <span>Поиск</span>
+                </div>
+            </div>
+            
+            <div class="side-menu-section">
+                <h4>Настройки</h4>
+                <div class="side-menu-item" onclick="showSettings()">
+                    <i class="fas fa-cog"></i>
+                    <span>Настройки</span>
+                </div>
+                <div class="side-menu-item" onclick="showThemes()">
+                    <i class="fas fa-palette"></i>
+                    <span>Темы</span>
+                </div>
+                <div class="side-menu-item" onclick="showSessionsModal()">
+                    <i class="fas fa-lock"></i>
+                    <span>Безопасность</span>
+                </div>
+            </div>
+            
+            <div class="side-menu-section" id="admin-section" style="display: none;">
+                <h4>Администрирование</h4>
+                <div class="side-menu-item" onclick="showAdminPanel()" id="admin-link">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Админ-панель</span>
+                </div>
+                <div class="side-menu-item" onclick="showSupport()">
+                    <i class="fas fa-headset"></i>
+                    <span>Поддержка</span>
+                </div>
+            </div>
+            
+            <div class="side-menu-section">
+                <h4>Информация</h4>
+                <div class="side-menu-item" onclick="showPrivacyPolicyModal()">
+                    <i class="fas fa-file-contract"></i>
+                    <span>Политика</span>
+                </div>
+                <div class="side-menu-item" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Выйти</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Основной контент -->
+        <div class="main-content">
+            <!-- Список чатов -->
+            <div id="chats-view" class="chats-view">
+                <div class="chats-header">
+                    <h2>Чаты</h2>
+                    <button class="new-chat-btn" onclick="showCreateChatModal()">
+                        <i class="fas fa-plus"></i> Новый чат
+                    </button>
+                </div>
+                <div class="chats-list" id="chats-list">
+                    <!-- Чаты загружаются динамически -->
+                    <div class="empty-state">
+                        <div class="empty-icon">💬</div>
+                        <p>Загрузка чатов...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Окно чата -->
+            <div id="chat-view" class="chat-view" style="display: none;">
+                <div class="chat-header">
+                    <button class="back-btn" onclick="showChats()">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <div class="chat-info">
+                        <div class="chat-name-large" id="chat-name"></div>
+                        <div class="chat-status" id="chat-status">Загрузка...</div>
+                    </div>
+                    <div class="chat-actions">
+                        <button class="chat-action-btn" onclick="showChatInfo()" title="Информация о чате">
+                            <i class="fas fa-info-circle"></i>
+                        </button>
+                        <button class="chat-action-btn" onclick="toggleSecretChat()" id="secret-chat-btn" title="Секретный чат">
+                            <i class="fas fa-lock"></i>
+                        </button>
+                        <button class="chat-action-btn" onclick="showChatMenu()" title="Меню чата">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="chat-window">
+                    <div class="messages-container" id="messages-container">
+                        <!-- Сообщения загружаются динамически -->
+                    </div>
+                    
+                    <div class="message-input-container">
+                        <button class="emoji-btn" onclick="showEmojiPicker()" title="Эмодзи">
+                            <i class="far fa-smile"></i>
+                        </button>
+                        <button class="attach-btn" onclick="showAttachmentMenu()" title="Прикрепить файл">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        <button class="gift-btn" onclick="showGiftPicker()" title="Отправить подарок">
+                            <i class="fas fa-gift"></i>
+                        </button>
+                        
+                        <div class="message-input-wrapper">
+                            <textarea class="message-input" id="message-input" 
+                                      placeholder="Введите сообщение..." 
+                                      rows="1"></textarea>
+                        </div>
+                        
+                        <button class="voice-record-btn" id="voice-record-btn"
+                                onmousedown="startVoiceRecording()"
+                                onmouseup="stopVoiceRecording()"
+                                onmouseleave="stopVoiceRecording()"
+                                ontouchstart="startVoiceRecording()"
+                                ontouchend="stopVoiceRecording()"
+                                title="Голосовое сообщение">
+                            <i class="fas fa-microphone"></i>
+                        </button>
+                        
+                        <button class="send-btn" onclick="sendMessage()" title="Отправить">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Друзья -->
+            <div id="friends-view" class="friends-view" style="display: none;">
+                <div class="friends-header">
+                    <h2>Друзья</h2>
+                    <button class="new-chat-btn" onclick="showAddFriendModal()">
+                        <i class="fas fa-user-plus"></i> Добавить друга
+                    </button>
+                </div>
+                
+                <div class="friends-tabs">
+                    <button class="friends-tab active" onclick="showFriendsTab('all')">Все друзья</button>
+                    <button class="friends-tab" onclick="showFriendsTab('requests')">Заявки <span id="requests-count" class="menu-badge" style="display: none;">0</span></button>
+                    <button class="friends-tab" onclick="showFriendsTab('online')">Онлайн</button>
+                </div>
+                
+                <div id="friends-list" class="friends-list">
+                    <!-- Друзья загружаются динамически -->
+                    <div class="empty-state">
+                        <div class="empty-icon">👥</div>
+                        <p>Загрузка списка друзей...</p>
+                    </div>
+                </div>
+                
+                <div id="friend-requests-list" style="display: none;">
+                    <!-- Заявки загружаются динамически -->
+                </div>
+            </div>
+
+            <!-- Подарки -->
+            <div id="gifts-view" class="gifts-view" style="display: none;">
+                <div class="gifts-header">
+                    <h2>Магазин подарков</h2>
+                    <button id="upload-gift-btn" class="upload-btn" style="display: none;" onclick="showUploadGiftForm()">
+                        <i class="fas fa-upload"></i> Загрузить подарок
+                    </button>
+                </div>
+                <div class="gifts-container" id="gifts-container">
+                    <!-- Подарки загружаются динамически -->
+                    <div class="empty-state">
+                        <div class="empty-icon">🎁</div>
+                        <p>Загрузка подарков...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Игры -->
+            <div id="games-view" class="games-view" style="display: none;">
+                <h2>Мини-игры</h2>
+                <div class="games-grid">
+                    <div class="game-card" onclick="startGame('tic_tac_toe')">
+                        <div class="game-icon">
+                            <i class="fas fa-times"></i>
+                        </div>
+                        <h3>Крестики-нолики</h3>
+                        <p>Классическая игра для двоих</p>
+                        <button class="play-btn">Играть</button>
+                    </div>
+                    
+                    <div class="game-card" onclick="showNotification('Скоро будет доступно!', 'info')">
+                        <div class="game-icon">
+                            <i class="fas fa-ship"></i>
+                        </div>
+                        <h3>Морской бой</h3>
+                        <p>Скоро...</p>
+                        <button class="play-btn" disabled>В разработке</button>
+                    </div>
+                    
+                    <div class="game-card" onclick="showNotification('Скоро будет доступно!', 'info')">
+                        <div class="game-icon">
+                            <i class="fas fa-chess"></i>
+                        </div>
+                        <h3>Шашки</h3>
+                        <p>Скоро...</p>
+                        <button class="play-btn" disabled>В разработке</button>
+                    </div>
+                </div>
+                
+                <div id="game-stats" style="margin-top: 2rem;">
+                    <!-- Статистика игр загружается динамически -->
+                </div>
+            </div>
+
+            <!-- Настройки -->
+            <div id="settings-view" class="settings-view" style="display: none;">
+                <h2>Настройки</h2>
+                <div class="settings-container">
+                    <div class="settings-section">
+                        <h3><i class="fas fa-user-cog"></i> Аккаунт</h3>
+                        <div class="settings-item">
+                            <span class="setting-label">Имя пользователя</span>
+                            <span class="setting-value" id="settings-username"></span>
+                        </div>
+                        <div class="settings-item">
+                            <span class="setting-label">Email</span>
+                            <span class="setting-value" id="settings-email"></span>
+                        </div>
+                        <div class="settings-item">
+                            <span class="setting-label">Верификация</span>
+                            <span class="setting-value" id="verification-status">
+                                Не подтвержден
+                            </span>
+                        </div>
+                        <div class="settings-item">
+                            <span class="setting-label">Баланс</span>
+                            <span class="setting-value" id="settings-balance">1000</span>
+                        </div>
+                        <div class="settings-item">
+                            <span class="setting-label">Статус</span>
+                            <span class="setting-value" id="settings-status"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3><i class="fas fa-globe"></i> Язык</h3>
+                        <div class="settings-item">
+                            <span class="setting-label">Язык интерфейса</span>
+                            <select class="setting-select" id="language-select" onchange="updateLanguage(this.value)">
+                                <option value="ru">Русский</option>
+                                <option value="en">English</option>
+                                <option value="es">Español</option>
+                                <option value="de">Deutsch</option>
+                                <option value="fr">Français</option>
+                                <option value="zh">中文</option>
+                                <option value="ja">日本語</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3><i class="fas fa-shield-alt"></i> Конфиденциальность</h3>
+                        <div class="settings-item">
+                            <span class="setting-label">Кто может писать вам</span>
+                            <select class="setting-select" id="allow-messages-select" onchange="updatePrivacySetting('allow_messages', this.value)">
+                                <option value="everyone">Все</option>
+                                <option value="friends">Только друзья</option>
+                                <option value="nobody">Никто</option>
+                            </select>
+                        </div>
+                        <div class="settings-item">
+                            <span class="setting-label">Кто может видеть онлайн</span>
+                            <select class="setting-select" id="show-online-select" onchange="updatePrivacySetting('show_online', this.value)">
+                                <option value="everyone">Все</option>
+                                <option value="friends">Только друзья</option>
+                                <option value="nobody">Никто</option>
+                            </select>
+                        </div>
+                        <div class="settings-item">
+                            <span class="setting-label">Кто может добавлять в друзья</span>
+                            <select class="setting-select" id="allow-friend-requests-select" onchange="updatePrivacySetting('allow_friend_requests', this.value)">
+                                <option value="everyone">Все</option>
+                                <option value="friends">Только друзья</option>
+                                <option value="nobody">Никто</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3><i class="fas fa-bell"></i> Уведомления</h3>
+                        <div class="settings-item">
+                            <span class="setting-label">Звук сообщений</span>
+                            <label class="switch">
+                                <input type="checkbox" id="sound-messages" checked onchange="updateNotificationSetting('messages', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-item">
+                            <span class="setting-label">Звук заявок в друзья</span>
+                            <label class="switch">
+                                <input type="checkbox" id="sound-friend-requests" checked onchange="updateNotificationSetting('friend_requests', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-item">
+                            <span class="setting-label">Звук игр</span>
+                            <label class="switch">
+                                <input type="checkbox" id="sound-games" checked onchange="updateNotificationSetting('games', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-item">
+                            <span class="setting-label">Уведомления на рабочем столе</span>
+                            <label class="switch">
+                                <input type="checkbox" id="desktop-notifications" onchange="toggleDesktopNotifications(this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3><i class="fas fa-palette"></i> Внешний вид</h3>
+                        <div class="settings-item">
+                            <span class="setting-label">Тема</span>
+                            <select class="setting-select" id="theme-select" onchange="updateTheme(this.value)">
+                                <option value="auto">Авто (по времени суток)</option>
+                                <option value="light">Светлая</option>
+                                <option value="dark">Темная</option>
+                                <option value="new-year">Новогодняя</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3><i class="fas fa-lock"></i> Безопасность</h3>
+                        <div class="settings-item">
+                            <span class="setting-label">Активные сессии</span>
+                            <button class="settings-btn" onclick="showSessionsModal()">Просмотр</button>
+                        </div>
+                        <div class="settings-item">
+                            <span class="setting-label">Двухфакторная аутентификация</span>
+                            <label class="switch">
+                                <input type="checkbox" id="two-factor-auth" onchange="toggleTwoFactor(this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-item">
+                            <span class="setting-label">End-to-End шифрование</span>
+                            <span class="setting-value">Включено</span>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3><i class="fas fa-database"></i> Данные</h3>
+                        <div class="settings-item">
+                            <span class="setting-label">Очистить историю сообщений</span>
+                            <button class="settings-btn" onclick="clearChatHistory()" style="background: #f44336;">Очистить</button>
+                        </div>
+                        <div class="settings-item">
+                            <span class="setting-label">Экспорт данных</span>
+                            <button class="settings-btn" onclick="exportData()">Экспорт</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Админ-панель -->
+            <div id="admin-view" class="admin-view" style="display: none;">
+                <div class="admin-header">
+                    <h2><i class="fas fa-shield-alt"></i> Панель администратора</h2>
+                    <div class="admin-role">Роль: <span id="admin-role-name"></span></div>
+                </div>
+                
+                <div class="admin-tabs">
+                    <button class="admin-tab active" onclick="showAdminTab('stats')">Статистика</button>
+                    <button class="admin-tab" onclick="showAdminTab('users')">Пользователи</button>
+                    <button class="admin-tab" onclick="showAdminTab('gifts')">Подарки</button>
+                    <button class="admin-tab" onclick="showAdminTab('reports')">Жалобы</button>
+                    <button class="admin-tab" onclick="showAdminTab('support')">Поддержка</button>
+                    <button class="admin-tab" onclick="showAdminTab('logs')">Логи</button>
+                </div>
+                
+                <div class="admin-content">
+                    <!-- Статистика -->
+                    <div id="stats-tab" class="admin-tab-content">
+                        <h3>Статистика системы</h3>
+                        <div id="admin-stats" class="admin-stats">
+                            <!-- Статистика загружается динамически -->
+                            <div class="stat-card">
+                                <h4>Загрузка...</h4>
+                                <div>...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Пользователи -->
+                    <div id="users-tab" class="admin-tab-content" style="display: none;">
+                        <h3>Управление пользователями</h3>
+                        <div style="margin-bottom: 1rem;">
+                            <input type="text" id="admin-user-search" placeholder="Поиск пользователей..." class="modal-input" style="width: 100%;" oninput="filterAdminUsers(this.value)">
+                        </div>
+                        <div id="admin-users-list">
+                            <!-- Пользователи загружаются динамически -->
+                        </div>
+                    </div>
+                    
+                    <!-- Подарки -->
+                    <div id="gifts-tab" class="admin-tab-content" style="display: none;">
+                        <h3>Управление подарками</h3>
+                        <div style="margin-bottom: 1rem;">
+                            <button class="settings-btn" onclick="showUploadGiftForm()" style="background: #4CAF50;">
+                                <i class="fas fa-plus"></i> Добавить подарок
+                            </button>
+                        </div>
+                        <div id="admin-gifts-list">
+                            <!-- Подарки загружаются динамически -->
+                        </div>
+                    </div>
+                    
+                    <!-- Жалобы -->
+                    <div id="reports-tab" class="admin-tab-content" style="display: none;">
+                        <h3>Жалобы</h3>
+                        <div id="admin-reports-list">
+                            <!-- Жалобы загружаются динамически -->
+                        </div>
+                    </div>
+                    
+                    <!-- Поддержка -->
+                    <div id="support-tab" class="admin-tab-content" style="display: none;">
+                        <h3>Обращения в поддержку</h3>
+                        <div id="admin-support-list">
+                            <!-- Обращения загружаются динамически -->
+                        </div>
+                    </div>
+                    
+                    <!-- Логи -->
+                    <div id="logs-tab" class="admin-tab-content" style="display: none;">
+                        <h3>Логи системы</h3>
+                        <div id="admin-logs-list">
+                            <!-- Логи загружаются динамически -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Поиск -->
+            <div id="search-view" class="search-view" style="display: none;">
+                <h2>Поиск</h2>
+                <div class="search-container">
+                    <div class="input-group">
+                        <i class="fas fa-search input-icon"></i>
+                        <input type="text" id="search-input" placeholder="Поиск сообщений, пользователей..." 
+                               class="search-input" oninput="search(this.value)">
+                    </div>
+                    <div id="search-results" class="search-results">
+                        <p class="empty-state">Введите запрос для поиска...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальные окна -->
+    <div id="modal-overlay" class="modal-overlay" style="display: none;"></div>
+    
+    <!-- Контейнер для снежинок -->
+    <div id="snowflakes-container" style="display: none;"></div>
+
+    <!-- Скрипты -->
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
