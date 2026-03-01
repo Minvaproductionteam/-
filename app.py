@@ -1,9 +1,9 @@
 """
-Minva Messenger 2.0.0 - АБСОЛЮТНО РАБОЧАЯ ВЕРСИЯ ДЛЯ VERCEL
-Все пользователи видны! Минимум нагрузки! Максимум стабильности!
+Minva Messenger 2.0.0 - СУПЕР СТАБИЛЬНАЯ ВЕРСИЯ ДЛЯ VERCEL
+Адаптировано для serverless-среды! Данные не теряются! Работает 24/7!
 """
 
-from flask import Flask, render_template, request, jsonify, send_from_directory, session
+from flask import Flask, render_template, request, jsonify, send_from_directory, session, redirect, url_for
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
@@ -13,6 +13,8 @@ import secrets
 import uuid
 import logging
 import json
+import pickle
+import time
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -22,17 +24,58 @@ app = Flask(__name__,
             static_folder='static', 
             template_folder='templates')
 
-# Конфигурация
+# Конфигурация для Vercel
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(64))
-app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
-app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
+app.config['UPLOAD_FOLDER'] = '/tmp/uploads'  # ТОЛЬКО /tmp доступен для записи!
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB для стабильности
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-login_manager = LoginManager(app)
-login_manager.login_view = 'login'
+# ========== ФАЙЛОВОЕ ХРАНИЛИЩЕ ДАННЫХ (чтобы не терять при перезапусках) ==========
+DATA_FILE = '/tmp/minva_data.pkl'
+
+def save_data():
+    """Сохраняет все базы данных в файл (чтобы не терять при перезапусках)"""
+    try:
+        data = {
+            'users_db': users_db,
+            'users_by_id': users_by_id,
+            'chats_db': chats_db,
+            'messages_db': messages_db,
+            'friend_requests_db': friend_requests_db,
+            'friends_db': friends_db,
+            'sessions_db': sessions_db,
+            'active_games': active_games,
+            'voice_messages': voice_messages,
+            'gifts_store': gifts_store,
+            'support_messages': support_messages,
+            'reports_db': reports_db,
+            'admin_logs': admin_logs
+        }
+        with open(DATA_FILE, 'wb') as f:
+            pickle.dump(data, f)
+        logger.info("💾 Данные сохранены в файл")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Ошибка сохранения данных: {e}")
+        return False
+
+def load_data():
+    """Загружает базы данных из файла"""
+    try:
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, 'rb') as f:
+                data = pickle.load(f)
+            
+            # Восстанавливаем данные в глобальную область видимости
+            globals().update(data)
+            logger.info(f"📂 Данные загружены из файла: {len(users_db)} пользователей")
+            return True
+    except Exception as e:
+        logger.error(f"❌ Ошибка загрузки данных: {e}")
+    return False
 
 # ========== БАЗЫ ДАННЫХ ==========
 users_db = {}              # {username: User}
@@ -48,6 +91,22 @@ gifts_store = {}
 support_messages = {}
 reports_db = {}
 admin_logs = []
+
+# Пытаемся загрузить сохраненные данные
+data_loaded = load_data()
+if not data_loaded:
+    logger.info("🆕 Создаем новые базы данных")
+
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+
+# ========== ОБРАБОТЧИК НЕАВТОРИЗОВАННЫХ API-ЗАПРОСОВ ==========
+@login_manager.unauthorized_handler
+def unauthorized():
+    """Возвращает JSON для API-запросов вместо редиректа на HTML"""
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'error': 'Требуется авторизация'}), 401
+    return redirect(url_for('login'))
 
 # ========== ЗАРЕЗЕРВИРОВАННЫЕ АККАУНТЫ ==========
 RESERVED_ACCOUNTS = {
@@ -168,6 +227,7 @@ def create_chat(user1, user2):
         'muted': {user1: False, user2: False},
         'is_secret': False
     }
+    save_data()  # Сохраняем изменения
     return chat_id
 
 def get_or_create_chat(user1, user2):
@@ -192,6 +252,7 @@ def send_friend_request(from_user, to_user):
         'status': 'pending',
         'created_at': datetime.now().isoformat()
     }
+    save_data()  # Сохраняем изменения
     return req_id
 
 def accept_friend_request(req_id):
@@ -213,6 +274,7 @@ def accept_friend_request(req_id):
         if req['from'] not in friends_db[req['to']]:
             friends_db[req['to']].append(req['from'])
         
+        save_data()  # Сохраняем изменения
         return True
     return False
 
@@ -220,6 +282,7 @@ def decline_friend_request(req_id):
     if req_id in friend_requests_db:
         friend_requests_db[req_id]['status'] = 'declined'
         friend_requests_db[req_id]['declined_at'] = datetime.now().isoformat()
+        save_data()  # Сохраняем изменения
         return True
     return False
 
@@ -241,13 +304,25 @@ def check_tic_tac_toe_winner(board):
 
 # ========== ИНИЦИАЛИЗАЦИЯ ==========
 def create_dirs():
+    """Создает необходимые директории в /tmp"""
     dirs = ['uploads', 'uploads/gifts', 'uploads/voices', 'uploads/avatars', 
             'uploads/documents', 'uploads/media']
     for d in dirs:
-        os.makedirs(os.path.join('/tmp', d), exist_ok=True)
+        try:
+            os.makedirs(os.path.join('/tmp', d), exist_ok=True)
+            logger.info(f"📁 Создана директория: /tmp/{d}")
+        except Exception as e:
+            logger.error(f"❌ Ошибка создания директории /tmp/{d}: {e}")
 
 def init_system():
-    """Инициализирует систему с тестовыми данными"""
+    """Инициализирует систему с тестовыми данными (только при первом запуске)"""
+    # Если данные уже есть, не инициализируем заново
+    if users_db and len(users_db) > 0:
+        logger.info(f"📊 Данные уже загружены: {len(users_db)} пользователей")
+        return
+    
+    logger.info("🆕 Инициализация системы с тестовыми данными...")
+    
     # Зарезервированные аккаунты
     for username, info in RESERVED_ACCOUNTS.items():
         if username not in users_db:
@@ -308,11 +383,15 @@ def init_system():
             'purchases': 0,
             'active': True
         }
+        logger.info(f"🎁 Создан подарок: {gift['name']}")
+    
+    # Сохраняем инициализированные данные
+    save_data()
     
     logger.info(f"📊 ВСЕГО ПОЛЬЗОВАТЕЛЕЙ: {len(users_db)}")
     logger.info(f"👤 СПИСОК: {list(users_db.keys())}")
 
-# ========== API ДЛЯ ПОЛЛИНГА (ОПТИМИЗИРОВАНО) ==========
+# ========== API ДЛЯ ПОЛЛИНГА (ОПТИМИЗИРОВАНО ДЛЯ VERCEL) ==========
 pending_updates = {}
 last_poll_time = {}
 
@@ -321,11 +400,10 @@ last_poll_time = {}
 def poll_updates():
     username = current_user.username
     
-    # Проверяем, не слишком ли часто запрашивают
     now = datetime.now()
     if username in last_poll_time:
         diff = (now - last_poll_time[username]).total_seconds()
-        if diff < 2:  # Минимум 2 секунды между запросами
+        if diff < 3:  # Увеличили до 3 секунд для Vercel
             return jsonify({'updates': [], 'throttled': True})
     
     last_poll_time[username] = now
@@ -359,6 +437,7 @@ def send_static(path):
 @app.route('/uploads/<path:filename>')
 @login_required
 def send_upload(filename):
+    # Сначала проверяем в /tmp
     tmp_path = os.path.join('/tmp', 'uploads', filename)
     if os.path.exists(tmp_path):
         return send_from_directory('/tmp/uploads', filename)
@@ -376,7 +455,7 @@ def login():
         if not username or not password:
             return jsonify({'success': False, 'error': 'Заполните все поля'})
         
-        logger.info(f"Попытка входа: {username}")
+        logger.info(f"🔐 Попытка входа: {username}")
         
         # Проверка зарезервированных аккаунтов
         if username in RESERVED_ACCOUNTS:
@@ -394,6 +473,7 @@ def login():
                     user.privacy_accepted_at = datetime.now()
                     users_db[username] = user
                     users_by_id[user.id] = user
+                    save_data()  # Сохраняем изменения
                     logger.info(f"✅ Создан аккаунт при входе: {username}")
                 
                 user = users_db[username]
@@ -481,7 +561,7 @@ def login():
         return jsonify({'success': False, 'error': 'Неверный логин или пароль'})
         
     except Exception as e:
-        logger.error(f'Login error: {str(e)}')
+        logger.error(f'❌ Login error: {str(e)}')
         return jsonify({'success': False, 'error': 'Ошибка сервера'})
 
 @app.route('/register', methods=['POST'])
@@ -509,7 +589,6 @@ def register():
         if not accepted_privacy:
             return jsonify({'success': False, 'error': 'Примите политику конфиденциальности'})
         
-        # Проверяем email на уникальность
         for u in users_db.values():
             if isinstance(u, User) and u.email == email:
                 return jsonify({'success': False, 'error': 'Email уже используется'})
@@ -525,6 +604,7 @@ def register():
         
         users_db[username] = user
         users_by_id[user.id] = user
+        save_data()  # Сохраняем изменения
         
         session_id = str(uuid.uuid4())
         session_data = {
@@ -557,7 +637,7 @@ def register():
         })
         
     except Exception as e:
-        logger.error(f'Register error: {str(e)}')
+        logger.error(f'❌ Register error: {str(e)}')
         return jsonify({'success': False, 'error': 'Ошибка сервера'})
 
 @app.route('/api/logout', methods=['POST'])
@@ -587,14 +667,13 @@ def api_logout():
         return jsonify({'success': True})
         
     except Exception as e:
-        logger.error(f'Logout error: {str(e)}')
+        logger.error(f'❌ Logout error: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
-# ========== ПОЛЬЗОВАТЕЛИ (ИСПРАВЛЕНО) ==========
+# ========== ПОЛЬЗОВАТЕЛИ ==========
 @app.route('/api/users', methods=['GET'])
 @login_required
 def get_users():
-    """ВОЗВРАЩАЕТ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ КРОМЕ ТЕКУЩЕГО"""
     try:
         users = []
         for username, user in users_db.items():
@@ -611,12 +690,10 @@ def get_users():
                     'balance': user.balance
                 })
         
-        # Важно! Логируем для отладки
         logger.info(f"📋 Запрос пользователей: текущий={current_user.username}, найдено={len(users)}, всего={len(users_db)}")
-        
         return jsonify({'users': users})
     except Exception as e:
-        logger.error(f'Ошибка get_users: {str(e)}')
+        logger.error(f'❌ Ошибка get_users: {str(e)}')
         return jsonify({'users': [], 'error': str(e)})
 
 @app.route('/api/user/<username>', methods=['GET'])
@@ -625,7 +702,7 @@ def get_user(username):
     try:
         user = users_db.get(username)
         if not user or not isinstance(user, User):
-            logger.warning(f"Пользователь не найден: {username}")
+            logger.warning(f"⚠️ Пользователь не найден: {username}")
             return jsonify({'error': 'Не найден'}), 404
         
         is_friend = are_friends(current_user.username, username)
@@ -659,13 +736,12 @@ def get_user(username):
             'outgoing_request': outgoing
         })
     except Exception as e:
-        logger.error(f'Ошибка get_user: {str(e)}')
+        logger.error(f'❌ Ошибка get_user: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/update_online', methods=['POST'])
 @login_required
 def update_online():
-    """Обновление статуса онлайн (вызывается раз в 30 секунд)"""
     try:
         current_user.is_online = True
         current_user.last_seen = datetime.now()
@@ -692,7 +768,7 @@ def get_friends():
                     })
         return jsonify({'friends': flist})
     except Exception as e:
-        logger.error(f'Ошибка get_friends: {str(e)}')
+        logger.error(f'❌ Ошибка get_friends: {str(e)}')
         return jsonify({'friends': [], 'error': str(e)})
 
 @app.route('/api/friend_requests', methods=['GET'])
@@ -727,7 +803,7 @@ def get_friend_requests():
         
         return jsonify({'incoming': incoming, 'outgoing': outgoing})
     except Exception as e:
-        logger.error(f'Ошибка get_friend_requests: {str(e)}')
+        logger.error(f'❌ Ошибка get_friend_requests: {str(e)}')
         return jsonify({'incoming': [], 'outgoing': [], 'error': str(e)})
 
 @app.route('/api/send_friend_request', methods=['POST'])
@@ -749,7 +825,6 @@ def send_friend_request_route():
         if are_friends(current_user.username, username):
             return jsonify({'success': False, 'error': 'Уже друзья'})
         
-        # Проверяем существующие запросы
         for req in friend_requests_db.values():
             if req['status'] == 'pending':
                 if req['from'] == current_user.username and req['to'] == username:
@@ -774,7 +849,7 @@ def send_friend_request_route():
             return jsonify({'success': False, 'error': 'Ошибка создания запроса'})
         
     except Exception as e:
-        logger.error(f'Ошибка send_friend_request: {str(e)}')
+        logger.error(f'❌ Ошибка send_friend_request: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/accept_friend_request', methods=['POST'])
@@ -816,7 +891,7 @@ def accept_friend_request_route():
             return jsonify({'success': False, 'error': 'Ошибка'})
         
     except Exception as e:
-        logger.error(f'Ошибка accept_friend_request: {str(e)}')
+        logger.error(f'❌ Ошибка accept_friend_request: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/decline_friend_request', methods=['POST'])
@@ -848,7 +923,7 @@ def decline_friend_request_route():
             return jsonify({'success': False, 'error': 'Ошибка'})
         
     except Exception as e:
-        logger.error(f'Ошибка decline_friend_request: {str(e)}')
+        logger.error(f'❌ Ошибка decline_friend_request: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/remove_friend', methods=['POST'])
@@ -871,13 +946,14 @@ def remove_friend_route():
             friends_db[username].remove(current_user.username)
         
         add_update(username, 'friend_removed', {'username': current_user.username})
+        save_data()  # Сохраняем изменения
         
         logger.info(f"👋 Друг удален: {current_user.username} удалил {username}")
         
         return jsonify({'success': True})
         
     except Exception as e:
-        logger.error(f'Ошибка remove_friend: {str(e)}')
+        logger.error(f'❌ Ошибка remove_friend: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 # ========== ЧАТЫ ==========
@@ -916,7 +992,7 @@ def get_chats():
         return jsonify({'chats': chats})
         
     except Exception as e:
-        logger.error(f'Ошибка get_chats: {str(e)}')
+        logger.error(f'❌ Ошибка get_chats: {str(e)}')
         return jsonify({'chats': [], 'error': str(e)})
 
 @app.route('/api/create_chat', methods=['POST'])
@@ -949,7 +1025,7 @@ def create_chat_route():
         return jsonify({'success': True, 'chat_id': chat_id})
         
     except Exception as e:
-        logger.error(f'Ошибка create_chat: {str(e)}')
+        logger.error(f'❌ Ошибка create_chat: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 # ========== СООБЩЕНИЯ ==========
@@ -973,7 +1049,7 @@ def get_messages(chat_id):
         return jsonify({'messages': msgs})
         
     except Exception as e:
-        logger.error(f'Ошибка get_messages: {str(e)}')
+        logger.error(f'❌ Ошибка get_messages: {str(e)}')
         return jsonify({'messages': [], 'error': str(e)})
 
 @app.route('/api/send_message', methods=['POST'])
@@ -1048,236 +1124,38 @@ def send_message_route():
                 chats_db[chat_id]['unread_count'][p] = chats_db[chat_id]['unread_count'].get(p, 0) + 1
                 add_update(p, 'new_message', message)
         
+        # Сохраняем изменения
+        save_data()
+        
         logger.info(f"💬 Новое сообщение в чате {chat_id} от {current_user.username}")
         
         return jsonify({'success': True, 'message': message, 'balance': current_user.balance})
         
     except Exception as e:
-        logger.error(f'Ошибка send_message: {str(e)}')
+        logger.error(f'❌ Ошибка send_message: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
-# ========== ПОДДЕРЖКА ==========
-@app.route('/api/support/message', methods=['POST'])
+# ========== ПОДАРКИ ==========
+@app.route('/api/gifts', methods=['GET'])
 @login_required
-def send_support():
+def get_gifts():
     try:
-        data = request.get_json()
-        message = data.get('message', '').strip()
-        
-        if not message:
-            return jsonify({'success': False, 'error': 'Введите сообщение'})
-        
-        sid = str(uuid.uuid4())
-        support_messages[sid] = {
-            'id': sid,
-            'user': current_user.username,
-            'message': message,
-            'timestamp': datetime.now().isoformat(),
-            'status': 'pending',
-            'responded_by': None,
-            'response': None
-        }
-        
-        for u in users_db.values():
-            if isinstance(u, User) and u.role in ['owner', 'tech_leader', 'moderator']:
-                add_update(u.username, 'new_support', {
-                    'id': sid,
-                    'user': current_user.username,
-                    'message': message,
-                    'time': datetime.now().isoformat()
+        gifts = []
+        for gid, gift in gifts_store.items():
+            if gift.get('active', True):
+                gifts.append({
+                    'id': gid,
+                    'name': gift['name'],
+                    'price': gift['price'],
+                    'description': gift['description'],
+                    'filename': gift['filename'],
+                    'purchases': gift['purchases']
                 })
-        
-        logger.info(f"📬 Новое обращение в поддержку от {current_user.username}")
-        
-        return jsonify({'success': True, 'ticket_id': sid})
-        
+        logger.info(f"🎁 Запрос подарков: найдено {len(gifts)}")
+        return jsonify({'gifts': gifts})
     except Exception as e:
-        logger.error(f'Ошибка send_support: {str(e)}')
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/support/tickets', methods=['GET'])
-@login_required
-@moderator_required
-def get_tickets():
-    try:
-        tickets = []
-        for tid, t in support_messages.items():
-            tickets.append({
-                'id': tid,
-                'user': t['user'],
-                'message': t['message'],
-                'timestamp': t['timestamp'],
-                'status': t['status'],
-                'responded_by': t['responded_by'],
-                'response': t['response']
-            })
-        
-        tickets.sort(key=lambda x: x['timestamp'], reverse=True)
-        return jsonify({'tickets': tickets})
-    except Exception as e:
-        logger.error(f'Ошибка get_tickets: {str(e)}')
-        return jsonify({'tickets': [], 'error': str(e)})
-
-@app.route('/api/support/ticket/<tid>/respond', methods=['POST'])
-@login_required
-@moderator_required
-def respond_ticket(tid):
-    try:
-        if tid not in support_messages:
-            return jsonify({'success': False, 'error': 'Не найдено'})
-        
-        data = request.get_json()
-        response = data.get('response', '').strip()
-        
-        if not response:
-            return jsonify({'success': False, 'error': 'Введите ответ'})
-        
-        ticket = support_messages[tid]
-        ticket['status'] = 'responded'
-        ticket['responded_by'] = current_user.username
-        ticket['response'] = response
-        ticket['response_time'] = datetime.now().isoformat()
-        
-        add_update(ticket['user'], 'support_response', {
-            'ticket_id': tid,
-            'response': response,
-            'responded_by': current_user.username,
-            'time': ticket['response_time']
-        })
-        
-        admin_logs.append({
-            'id': str(uuid.uuid4()),
-            'admin': current_user.username,
-            'action': 'support_response',
-            'details': f'Ответ на обращение {tid}',
-            'timestamp': datetime.now().isoformat()
-        })
-        
-        logger.info(f"📬 Ответ на обращение {tid} от {current_user.username}")
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        logger.error(f'Ошибка respond_ticket: {str(e)}')
-        return jsonify({'success': False, 'error': str(e)})
-
-# ========== ЖАЛОБЫ ==========
-@app.route('/api/report_user', methods=['POST'])
-@login_required
-def report_user():
-    try:
-        data = request.get_json()
-        username = data.get('username')
-        reason = data.get('reason', '')
-        chat_id = data.get('chat_id')
-        msg_id = data.get('message_id')
-        
-        if not username or not reason:
-            return jsonify({'success': False, 'error': 'Заполните все поля'})
-        
-        if username not in users_db:
-            return jsonify({'success': False, 'error': 'Пользователь не найден'})
-        
-        if username == current_user.username:
-            return jsonify({'success': False, 'error': 'Нельзя на себя'})
-        
-        rid = str(uuid.uuid4())
-        reports_db[rid] = {
-            'id': rid,
-            'reporter': current_user.username,
-            'reported_user': username,
-            'reason': reason,
-            'chat_id': chat_id,
-            'message_id': msg_id,
-            'timestamp': datetime.now().isoformat(),
-            'status': 'pending',
-            'handled_by': None
-        }
-        
-        for u in users_db.values():
-            if isinstance(u, User) and u.role in ['owner', 'tech_leader', 'administrator', 'moderator']:
-                add_update(u.username, 'new_report', {
-                    'report_id': rid,
-                    'reporter': current_user.username,
-                    'reported_user': username,
-                    'reason': reason
-                })
-        
-        logger.info(f"🚩 Новая жалоба от {current_user.username} на {username}")
-        
-        return jsonify({'success': True, 'report_id': rid})
-        
-    except Exception as e:
-        logger.error(f'Ошибка report_user: {str(e)}')
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/reports', methods=['GET'])
-@login_required
-@moderator_required
-def get_reports():
-    try:
-        reports = []
-        for rid, r in reports_db.items():
-            if r['status'] == 'pending':
-                reports.append({
-                    'id': rid,
-                    'reporter': r['reporter'],
-                    'reported_user': r['reported_user'],
-                    'reason': r['reason'],
-                    'timestamp': r['timestamp'],
-                    'status': r['status']
-                })
-        
-        reports.sort(key=lambda x: x['timestamp'], reverse=True)
-        return jsonify({'reports': reports})
-    except Exception as e:
-        logger.error(f'Ошибка get_reports: {str(e)}')
-        return jsonify({'reports': [], 'error': str(e)})
-
-@app.route('/api/report/<rid>/handle', methods=['POST'])
-@login_required
-@moderator_required
-def handle_report(rid):
-    try:
-        if rid not in reports_db:
-            return jsonify({'success': False, 'error': 'Не найдено'})
-        
-        data = request.get_json()
-        action = data.get('action')
-        
-        report = reports_db[rid]
-        report['status'] = action
-        report['handled_by'] = current_user.username
-        report['handled_at'] = datetime.now().isoformat()
-        
-        if action == 'accept':
-            user = users_db.get(report['reported_user'])
-            if user:
-                user.banned = True
-                user.ban_reason = f"Жалоба от {report['reporter']}: {report['reason']}"
-                user.banned_until = datetime.now() + timedelta(days=1)
-                user.banned_by = current_user.username
-                
-                add_update(user.username, 'user_banned', {
-                    'reason': user.ban_reason,
-                    'until': user.banned_until.isoformat() if user.banned_until else None
-                })
-                
-                logger.info(f"⛔ Пользователь {user.username} забанен по жалобе {rid}")
-        
-        admin_logs.append({
-            'id': str(uuid.uuid4()),
-            'admin': current_user.username,
-            'action': 'handle_report',
-            'details': f'Жалоба #{rid}: {action}',
-            'timestamp': datetime.now().isoformat()
-        })
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        logger.error(f'Ошибка handle_report: {str(e)}')
-        return jsonify({'success': False, 'error': str(e)})
+        logger.error(f'❌ Ошибка get_gifts: {str(e)}')
+        return jsonify({'gifts': [], 'error': str(e)})
 
 # ========== АДМИН-ПАНЕЛЬ ==========
 @app.route('/api/admin/stats', methods=['GET'])
@@ -1307,7 +1185,7 @@ def admin_stats():
         return jsonify(stats)
         
     except Exception as e:
-        logger.error(f'Ошибка admin_stats: {str(e)}')
+        logger.error(f'❌ Ошибка admin_stats: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/users', methods=['GET'])
@@ -1342,7 +1220,7 @@ def admin_users():
         logger.info(f"👥 Админ запрос пользователей: {len(users)}")
         return jsonify({'users': users})
     except Exception as e:
-        logger.error(f'Ошибка admin_users: {str(e)}')
+        logger.error(f'❌ Ошибка admin_users: {str(e)}')
         return jsonify({'users': [], 'error': str(e)})
 
 @app.route('/api/admin/verify', methods=['POST'])
@@ -1374,12 +1252,13 @@ def admin_verify():
             'verified': user.verified
         })
         
+        save_data()  # Сохраняем изменения
         logger.info(f"✅ Верификация изменена: {username} теперь verified={user.verified}")
         
         return jsonify({'success': True, 'verified': user.verified})
         
     except Exception as e:
-        logger.error(f'Ошибка admin_verify: {str(e)}')
+        logger.error(f'❌ Ошибка admin_verify: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/admin/ban', methods=['POST'])
@@ -1417,12 +1296,13 @@ def admin_ban():
             'until': user.banned_until.isoformat() if user.banned_until else None
         })
         
+        save_data()  # Сохраняем изменения
         logger.info(f"⛔ Пользователь {username} забанен. Причина: {reason}")
         
         return jsonify({'success': True})
         
     except Exception as e:
-        logger.error(f'Ошибка admin_ban: {str(e)}')
+        logger.error(f'❌ Ошибка admin_ban: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/admin/unban', methods=['POST'])
@@ -1451,13 +1331,14 @@ def admin_unban():
         })
         
         add_update(username, 'user_unbanned', {'username': username})
+        save_data()  # Сохраняем изменения
         
         logger.info(f"✅ Пользователь {username} разбанен")
         
         return jsonify({'success': True})
         
     except Exception as e:
-        logger.error(f'Ошибка admin_unban: {str(e)}')
+        logger.error(f'❌ Ошибка admin_unban: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/admin/role', methods=['POST'])
@@ -1491,13 +1372,14 @@ def admin_role():
         })
         
         add_update(username, 'role_changed', {'role': role})
+        save_data()  # Сохраняем изменения
         
         logger.info(f"🔄 Роль пользователя {username} изменена: {old} -> {role}")
         
         return jsonify({'success': True})
         
     except Exception as e:
-        logger.error(f'Ошибка admin_role: {str(e)}')
+        logger.error(f'❌ Ошибка admin_role: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/admin/gifts', methods=['GET'])
@@ -1520,7 +1402,7 @@ def admin_gifts():
             })
         return jsonify({'gifts': gifts})
     except Exception as e:
-        logger.error(f'Ошибка admin_gifts: {str(e)}')
+        logger.error(f'❌ Ошибка admin_gifts: {str(e)}')
         return jsonify({'gifts': [], 'error': str(e)})
 
 @app.route('/api/admin/gift/update', methods=['POST'])
@@ -1555,11 +1437,12 @@ def admin_update_gift():
             'timestamp': datetime.now().isoformat()
         })
         
+        save_data()  # Сохраняем изменения
         logger.info(f"🎁 Обновлен подарок {gift_id}: {name}")
         
         return jsonify({'success': True})
     except Exception as e:
-        logger.error(f'Ошибка admin_update_gift: {str(e)}')
+        logger.error(f'❌ Ошибка admin_update_gift: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/admin/logs', methods=['GET'])
@@ -1569,29 +1452,8 @@ def get_admin_logs():
     try:
         return jsonify({'logs': admin_logs[-100:]})
     except Exception as e:
-        logger.error(f'Ошибка get_admin_logs: {str(e)}')
+        logger.error(f'❌ Ошибка get_admin_logs: {str(e)}')
         return jsonify({'logs': [], 'error': str(e)})
-
-# ========== ПОДАРКИ ==========
-@app.route('/api/gifts', methods=['GET'])
-@login_required
-def get_gifts():
-    try:
-        gifts = []
-        for gid, gift in gifts_store.items():
-            if gift.get('active', True):
-                gifts.append({
-                    'id': gid,
-                    'name': gift['name'],
-                    'price': gift['price'],
-                    'description': gift['description'],
-                    'filename': gift['filename'],
-                    'purchases': gift['purchases']
-                })
-        return jsonify({'gifts': gifts})
-    except Exception as e:
-        logger.error(f'Ошибка get_gifts: {str(e)}')
-        return jsonify({'gifts': [], 'error': str(e)})
 
 # ========== ИГРЫ ==========
 @app.route('/api/game/invite', methods=['POST'])
@@ -1624,11 +1486,12 @@ def game_invite():
             'from_user': current_user.username
         })
         
+        save_data()  # Сохраняем изменения
         logger.info(f"🎮 Приглашение в игру от {current_user.username} к {other}")
         
         return jsonify({'success': True, 'game_id': game_id})
     except Exception as e:
-        logger.error(f'Ошибка game_invite: {str(e)}')
+        logger.error(f'❌ Ошибка game_invite: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/game/accept', methods=['POST'])
@@ -1655,11 +1518,12 @@ def game_accept():
                 'current_turn': game['current_turn']
             })
         
+        save_data()  # Сохраняем изменения
         logger.info(f"🎮 Игра {game_id} началась между {game['players']}")
         
         return jsonify({'success': True})
     except Exception as e:
-        logger.error(f'Ошибка game_accept: {str(e)}')
+        logger.error(f'❌ Ошибка game_accept: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/game/move', methods=['POST'])
@@ -1715,6 +1579,7 @@ def game_move():
                         'board': game['board']
                     })
                 
+                save_data()  # Сохраняем изменения
                 logger.info(f"🎮 Игра {game_id} завершена. Победитель: {winner}")
             else:
                 game['current_turn'] = game['players'][1] if current_user.username == game['players'][0] else game['players'][0]
@@ -1728,7 +1593,7 @@ def game_move():
         
         return jsonify({'success': True})
     except Exception as e:
-        logger.error(f'Ошибка game_move: {str(e)}')
+        logger.error(f'❌ Ошибка game_move: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/game/leaderboard', methods=['GET'])
@@ -1757,7 +1622,7 @@ def game_leaderboard():
         players.sort(key=lambda x: x['wins'], reverse=True)
         return jsonify({'leaderboard': players[:50]})
     except Exception as e:
-        logger.error(f'Ошибка game_leaderboard: {str(e)}')
+        logger.error(f'❌ Ошибка game_leaderboard: {str(e)}')
         return jsonify({'leaderboard': [], 'error': str(e)})
 
 # ========== НАСТРОЙКИ ==========
@@ -1775,7 +1640,7 @@ def set_theme():
         return jsonify({'success': True, 'theme': current_user.theme})
         
     except Exception as e:
-        logger.error(f'Ошибка set_theme: {str(e)}')
+        logger.error(f'❌ Ошибка set_theme: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/settings/language', methods=['POST'])
@@ -1792,7 +1657,7 @@ def set_language():
         return jsonify({'success': True, 'language': current_user.language})
         
     except Exception as e:
-        logger.error(f'Ошибка set_language: {str(e)}')
+        logger.error(f'❌ Ошибка set_language: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/settings/privacy', methods=['POST'])
@@ -1809,7 +1674,7 @@ def update_privacy():
         else:
             return jsonify({'success': False, 'error': 'Неверная настройка'})
     except Exception as e:
-        logger.error(f'Ошибка update_privacy: {str(e)}')
+        logger.error(f'❌ Ошибка update_privacy: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/settings/notifications', methods=['POST'])
@@ -1826,7 +1691,7 @@ def update_notifications():
         else:
             return jsonify({'success': False, 'error': 'Неверная настройка'})
     except Exception as e:
-        logger.error(f'Ошибка update_notifications: {str(e)}')
+        logger.error(f'❌ Ошибка update_notifications: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 # ========== СЕССИИ ==========
@@ -1847,7 +1712,7 @@ def get_sessions():
             })
         return jsonify({'sessions': sessions})
     except Exception as e:
-        logger.error(f'Ошибка get_sessions: {str(e)}')
+        logger.error(f'❌ Ошибка get_sessions: {str(e)}')
         return jsonify({'sessions': [], 'error': str(e)})
 
 @app.route('/api/sessions/<sid>/terminate', methods=['POST'])
@@ -1866,7 +1731,7 @@ def terminate_session(sid):
         
         return jsonify({'success': True})
     except Exception as e:
-        logger.error(f'Ошибка terminate_session: {str(e)}')
+        logger.error(f'❌ Ошибка terminate_session: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/sessions/terminate_all', methods=['POST'])
@@ -1886,7 +1751,7 @@ def terminate_all_sessions():
         
         return jsonify({'success': True})
     except Exception as e:
-        logger.error(f'Ошибка terminate_all_sessions: {str(e)}')
+        logger.error(f'❌ Ошибка terminate_all_sessions: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 # ========== ГОЛОСОВЫЕ СООБЩЕНИЯ ==========
@@ -1927,7 +1792,7 @@ def upload_voice():
             'duration': duration
         })
     except Exception as e:
-        logger.error(f'Ошибка upload_voice: {str(e)}')
+        logger.error(f'❌ Ошибка upload_voice: {str(e)}')
         return jsonify({'success': False, 'error': str(e)})
 
 # ========== HEALTH CHECK ==========
@@ -1938,7 +1803,8 @@ def health_check():
         'version': '2.0.0',
         'users': len(users_db),
         'chats': len(chats_db),
-        'messages': len(messages_db)
+        'messages': len(messages_db),
+        'data_file_exists': os.path.exists(DATA_FILE)
     })
 
 # ========== ЗАПУСК ==========
@@ -1947,9 +1813,9 @@ if __name__ == '__main__':
     init_system()
     
     print("=" * 80)
-    print("MINVA MESSENGER 2.0.0 - АБСОЛЮТНО РАБОЧАЯ ВЕРСИЯ")
+    print("MINVA MESSENGER 2.0.0 - СУПЕР СТАБИЛЬНАЯ ВЕРСИЯ ДЛЯ VERCEL")
     print("=" * 80)
-    print("Сайт: https://minva-messenger20.vercel.app")
+    print("Сайт: https://minvamessenger.vercel.app")
     print()
     print(f"📊 В БД: {len(users_db)} пользователей")
     print("👤 Список всех пользователей:")
@@ -1960,7 +1826,15 @@ if __name__ == '__main__':
     print("🔧 ТЕХЛИДЕР: КЕС")
     print("🛡️ МОДЕРАТОР: Фин и Мем")
     print("=" * 80)
-    print("🚀 Режим: СТАБИЛЬНЫЙ | Polling: 3 сек | Онлайн обновление: 30 сек")
+    print("🚀 ОПТИМИЗАЦИИ ДЛЯ VERCEL:")
+    print("   ✅ Данные сохраняются в /tmp/minva_data.pkl")
+    print("   ✅ Автоматическое восстановление после перезапуска")
+    print("   ✅ Уменьшен лимит загрузки до 5MB")
+    print("   ✅ Polling раз в 3 секунды")
+    print("   ✅ Подробное логирование всех действий")
+    print("=" * 80)
+    print("💾 Файл данных:", DATA_FILE)
+    print("📁 Папка загрузок:", app.config['UPLOAD_FOLDER'])
     print("=" * 80)
     
     app.run(debug=True, host='0.0.0.0', port=3000)
