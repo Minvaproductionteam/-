@@ -3,5 +3,5 @@ Flask-Login==0.6.2
 Werkzeug==2.3.7
 Pillow==10.1.0
 gunicorn==21.2.0
-python-socketio==5.9.0
-python-engineio==4.5.1
+python-socketio==5.11.1
+python-engineio==4.8.0
